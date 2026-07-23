@@ -20,5 +20,6 @@ jobs:
     - name: Install devenv.sh
       run: nix profile add nixpkgs#devenv
 
-    - name: Build the devenv shell and run any pre-commit hooks
+    - name: Run command in flake shell
+      shell: bash -c "nix develop --impure -c bash -- {0}"
       run: devenv test
