@@ -23,3 +23,12 @@ jobs:
     - name: Run command in flake shell
       shell: bash -c "nix develop --impure -c bash -- {0}"
       run: devenv test
+
+    - name: Build release artifact
+      run: nix build .#default
+
+    - name: Upload release artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: devenv-rust-test-${{ matrix.os }}
+        path: result/bin/devenv-rust-test
