@@ -52,7 +52,11 @@
             languages.rust.enable = true;
 
             # https://devenv.sh/reference/options/
-            packages = [ config.packages.default ];
+            packages = [ config.packages.default pkgs.cargo-nextest ];
+
+            enterTest = ''
+              cargo nextest run
+            '';
           };
 
         };

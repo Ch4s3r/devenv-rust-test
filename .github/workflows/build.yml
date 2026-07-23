@@ -24,11 +24,8 @@ jobs:
       - name: Install devenv.sh
         run: nix profile add nixpkgs#devenv
 
-      - name: Build the devenv shell and run any pre-commit hooks
+      - name: Build the devenv shell, run pre-commit hooks, and run tests
         run: devenv test
-
-      - name: Run tests
-        run: nix develop --impure -c cargo test
 
       - name: Determine Nix system
         id: nix-system

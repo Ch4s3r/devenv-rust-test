@@ -26,7 +26,14 @@ The package version is derived from `Cargo.toml` plus the current git commit has
 cargo test
 ```
 
-`nix build`/`buildRustPackage` also runs the test suite as part of its check phase.
+or, inside the devenv shell, via [cargo-nextest](https://nexte.st):
+
+```
+devenv test
+```
+
+which runs `cargo nextest run`. `nix build`/`buildRustPackage` also runs the test
+suite as part of its check phase.
 
 ## CI
 
@@ -37,7 +44,7 @@ cargo test
 
 Each job follows the [devenv GitHub Actions integration](https://devenv.sh/integrations/github-actions/)
 pattern (`cachix/install-nix-action`, `cachix/cachix-action` with the `devenv` cache,
-`nix profile add nixpkgs#devenv`, `devenv test`), runs `cargo test` via `nix develop`.
+`nix profile add nixpkgs#devenv`, `devenv test`), which runs `cargo nextest run`.
 Since this project uses devenv via [flake-parts](https://devenv.sh/guides/using-with-flake-parts/),
 whose flake-integration CLI only exposes `tasks`/`test`/`up`/`version` (no `devenv shell`),
 the binary itself is built with `nix build .#packages.<system>.default` and uploaded as a
