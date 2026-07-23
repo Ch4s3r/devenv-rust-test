@@ -57,6 +57,10 @@
             enterTest = ''
               cargo nextest run
             '';
+
+            scripts.build.exec = ''
+              cargo build --release
+            '';
           };
 
         };
