@@ -1,0 +1,9 @@
+.devenv
+.direnv/flake-inputs/
+.direnv/flake-profile-*
+result
+
+
+# Added by cargo
+
+/target
