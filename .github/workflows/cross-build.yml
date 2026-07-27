@@ -32,6 +32,7 @@ jobs:
       run: build-aarch64-darwin
 
     - name: Verify cross-built artifact is a Mach-O arm64 binary
+      shell: bash -c "nix develop --impure -c bash -- {0}"
       run: file target/aarch64-apple-darwin/release/devenv-rust-test | grep -q 'Mach-O 64-bit arm64 executable'
 
     - name: Upload aarch64-apple-darwin release artifact

@@ -58,7 +58,7 @@
             };
 
             # https://devenv.sh/reference/options/
-            packages = [ pkgs.cargo-nextest pkgs.cargo-zigbuild pkgs.zig ];
+            packages = [ pkgs.cargo-nextest pkgs.cargo-zigbuild pkgs.zig pkgs.file ];
 
             scripts.build.exec = ''
               cargo build --release
