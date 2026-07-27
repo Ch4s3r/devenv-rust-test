@@ -37,15 +37,23 @@ suite as part of its check phase.
 
 ## CI
 
-`.github/workflows/build.yml` builds and tests the binary in a matrix across:
+`.github/workflows/cross-build.yml` runs on a single `ubuntu-latest` runner and:
 
-- `x86_64-linux` on `ubuntu-latest`
-- `aarch64-darwin` on `macos-14`
+- runs `cargo nextest run` (via the `tests` devenv script)
+- builds the native `x86_64-linux` release binary (via the `build` devenv script)
+- cross-compiles an `aarch64-apple-darwin` release binary using
+  [`cargo-zigbuild`](https://github.com/rust-cross/cargo-zigbuild) (via the
+  `build-aarch64-darwin` devenv script), since Nix's own cross-compilation does not support
+  building for Darwin from a Linux build platform
 
-Each job follows the [devenv GitHub Actions integration](https://devenv.sh/integrations/github-actions/)
+Both binaries are uploaded as workflow artifacts (`devenv-rust-test-x86_64-linux` and
+`devenv-rust-test-aarch64-darwin`).
+
+Each step follows the [devenv GitHub Actions integration](https://devenv.sh/integrations/github-actions/)
 pattern (`cachix/install-nix-action`, `cachix/cachix-action` with the `devenv` cache,
-`nix profile add nixpkgs#devenv`, `devenv test`), which runs `cargo nextest run`.
-Since this project uses devenv via [flake-parts](https://devenv.sh/guides/using-with-flake-parts/),
-whose flake-integration CLI only exposes `tasks`/`test`/`up`/`version` (no `devenv shell`),
-the binary itself is built with `nix build .#packages.<system>.default` and uploaded as a
-workflow artifact.
+`nix profile add nixpkgs#devenv`, `nix develop --impure -c bash -- {0}` running the named
+devenv script).
+
+`.github/workflows/build.yml` (the previous `ubuntu-latest` + `macos-latest` matrix, building
+natively on a real macOS runner) is disabled — its trigger is commented out — and kept only
+for reference.

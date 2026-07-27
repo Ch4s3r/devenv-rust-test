@@ -1,0 +1,45 @@
+name: "Build"
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v5
+    - uses: cachix/install-nix-action@v31
+    - uses: cachix/cachix-action@v16
+      with:
+        name: devenv
+    - name: Install devenv.sh
+      run: nix profile add nixpkgs#devenv
+
+    - name: Run tests
+      shell: bash -c "nix develop --impure -c bash -- {0}"
+      run: tests
+
+    - name: Build native release artifact
+      shell: bash -c "nix develop --impure -c bash -- {0}"
+      run: build
+
+    - name: Upload native release artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: devenv-rust-test-x86_64-linux
+        path: target/release/devenv-rust-test
+
+    - name: Cross-build aarch64-apple-darwin release artifact
+      shell: bash -c "nix develop --impure -c bash -- {0}"
+      run: build-aarch64-darwin
+
+    - name: Verify cross-built artifact is a Mach-O arm64 binary
+      run: file target/aarch64-apple-darwin/release/devenv-rust-test | grep -q 'Mach-O 64-bit arm64 executable'
+
+    - name: Upload aarch64-apple-darwin release artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: devenv-rust-test-aarch64-darwin
+        path: target/aarch64-apple-darwin/release/devenv-rust-test

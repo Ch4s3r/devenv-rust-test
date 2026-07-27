@@ -7,6 +7,8 @@
       flake = false;
     };
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     devenv.url = "github:cachix/devenv";
@@ -49,13 +51,21 @@
               # ./devenv-foo.nix
             ];
 
-            languages.rust.enable = true;
+            languages.rust = {
+              enable = true;
+              channel = "stable";
+              targets = [ "aarch64-apple-darwin" ];
+            };
 
             # https://devenv.sh/reference/options/
-            packages = [ pkgs.cargo-nextest ];
+            packages = [ pkgs.cargo-nextest pkgs.cargo-zigbuild pkgs.zig ];
 
             scripts.build.exec = ''
               cargo build --release
+            '';
+
+            scripts.build-aarch64-darwin.exec = ''
+              cargo zigbuild --release --target aarch64-apple-darwin
             '';
 
             scripts.tests.exec = ''
