@@ -20,9 +20,9 @@ jobs:
     - name: Install devenv.sh
       run: nix profile add nixpkgs#devenv
 
-    - name: Run command in flake shell
+    - name: Run tests
       shell: bash -c "nix develop --impure -c bash -- {0}"
-      run: devenv test
+      run: tests
 
     - name: Build release artifact
       shell: bash -c "nix develop --impure -c bash -- {0}"

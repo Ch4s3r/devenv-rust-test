@@ -52,14 +52,14 @@
             languages.rust.enable = true;
 
             # https://devenv.sh/reference/options/
-            packages = [ config.packages.default pkgs.cargo-nextest ];
-
-            enterTest = ''
-              cargo nextest run
-            '';
+            packages = [ pkgs.cargo-nextest ];
 
             scripts.build.exec = ''
               cargo build --release
+            '';
+
+            scripts.tests.exec = ''
+              cargo nextest run
             '';
           };
 
