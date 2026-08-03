@@ -12,6 +12,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -c "nix develop --impure -c bash -- {0}"
 
     steps:
     - uses: actions/checkout@v5
@@ -20,14 +23,13 @@ jobs:
       with:
         name: devenv
     - name: Install devenv.sh
+      shell: bash
       run: nix profile add nixpkgs#devenv
 
     - name: Run tests
-      shell: bash -c "nix develop --impure -c bash -- {0}"
       run: tests
 
     - name: Build release artifact
-      shell: bash -c "nix develop --impure -c bash -- {0}"
       run: build
 
     - name: Upload release artifact

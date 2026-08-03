@@ -46,6 +46,17 @@ suite as part of its check phase.
   `build-aarch64-darwin` devenv script), since Nix's own cross-compilation does not support
   building for Darwin from a Linux build platform
 
+The `aarch64-apple-darwin` binary is then code-signed using
+[`rcodesign`](https://github.com/indygreg/apple-platform-rs) (via the
+`sign-aarch64-darwin` devenv script), a pure-Rust, cross-platform implementation of
+Apple code signing that works on the Linux `arc-runner-set` CI runner without needing
+a real macOS host.
+
+If the repository secrets `MACOS_CODESIGN_P12_BASE64` and `MACOS_CODESIGN_P12_PASSWORD`
+are set, the workflow decodes the base64 secret into a `.p12` certificate and signs the
+binary with it. Otherwise it falls back to ad-hoc signing (no identity), which is enough
+to satisfy macOS Gatekeeper for local/unnotarized use but not for distribution.
+
 Both binaries are uploaded as workflow artifacts (`devenv-rust-test-x86_64-linux` and
 `devenv-rust-test-aarch64-darwin`).
 

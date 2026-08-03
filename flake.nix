@@ -58,7 +58,7 @@
             };
 
             # https://devenv.sh/reference/options/
-            packages = [ pkgs.cargo-nextest pkgs.cargo-zigbuild pkgs.zig pkgs.file ];
+            packages = [ pkgs.cargo-nextest pkgs.cargo-zigbuild pkgs.zig pkgs.file pkgs.rcodesign ];
 
             scripts.build.exec = ''
               cargo build --release
@@ -66,6 +66,21 @@
 
             scripts.build-aarch64-darwin.exec = ''
               cargo zigbuild --release --target aarch64-apple-darwin
+            '';
+
+            scripts.sign-aarch64-darwin.exec = ''
+              set -euo pipefail
+              binary=target/aarch64-apple-darwin/release/devenv-rust-test
+              p12="''${MACOS_CODESIGN_P12_PATH:-/tmp/codesign.p12}"
+
+              if [ -f "$p12" ]; then
+                rcodesign sign --p12-file "$p12" --p12-password "$MACOS_CODESIGN_P12_PASSWORD" "$binary"
+              else
+                echo "no codesigning certificate found at $p12, falling back to ad-hoc signing"
+                rcodesign sign "$binary"
+              fi
+
+              rcodesign print-signature-info "$binary"
             '';
 
             scripts.tests.exec = ''
