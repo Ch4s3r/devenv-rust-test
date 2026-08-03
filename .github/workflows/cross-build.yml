@@ -10,8 +10,12 @@ jobs:
       run:
         shell: bash -c "nix develop --impure -c bash -- {0}"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: DeterminateSystems/determinate-nix-action@main
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
       - name: Install devenv.sh
         shell: bash
         run: nix profile add nixpkgs#devenv
