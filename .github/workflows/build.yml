@@ -32,7 +32,7 @@ jobs:
       run: du -sh /nix/store
 
     - name: Build release artifact
-      run: build
+      run: nix build .#default
 
     - name: Code-sign macOS release artifact
       if: matrix.os == 'macos-latest'
@@ -49,4 +49,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: devenv-rust-test-${{ matrix.os }}
-        path: target/release/devenv-rust-test
+        path: result/bin/devenv-rust-test
