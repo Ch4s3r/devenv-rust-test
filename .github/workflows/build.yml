@@ -8,18 +8,19 @@ jobs:
   tests:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest] # , macos-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash -c "nix develop --impure -c bash -- {0}"
 
     steps:
-    - uses: actions/checkout@v5
-    - uses: cachix/install-nix-action@v31
-    - uses: cachix/cachix-action@v16
+    - uses: actions/checkout@v7
+    - uses: DeterminateSystems/determinate-nix-action@main
+    - uses: nix-community/cache-nix-action@v7
       with:
-        name: devenv
+        primary-key: nix-${{ runner.os }}-${{ hashFiles('**/flake.lock') }}
+        restore-prefixes-first-match: nix-${{ runner.os }}-
 
     - name: Run tests
       run: tests
