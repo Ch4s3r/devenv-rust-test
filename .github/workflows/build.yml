@@ -22,8 +22,14 @@ jobs:
         primary-key: nix-${{ runner.os }}-${{ hashFiles('**/flake.lock') }}
         restore-prefixes-first-match: nix-${{ runner.os }}-
 
+    - name: Check /nix/store size after nix install
+      run: du -sh /nix/store
+
     - name: Run tests
       run: tests
+
+    - name: Check /nix/store size after running tests
+      run: du -sh /nix/store
 
     - name: Build release artifact
       run: build
