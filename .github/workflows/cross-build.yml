@@ -16,9 +16,6 @@ jobs:
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('**/flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
-      - name: Install devenv.sh
-        shell: bash
-        run: nix profile add nixpkgs#devenv
       - name: Cross-build aarch64-apple-darwin release artifact
         run: build-aarch64-darwin
       - name: Code-sign aarch64-apple-darwin release artifact
