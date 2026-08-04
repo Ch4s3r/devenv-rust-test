@@ -12,6 +12,8 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     devenv.url = "github:cachix/devenv";
+    crate2nix.url = "github:nix-community/crate2nix";
+    crate2nix.inputs.nixpkgs.follows = "nixpkgs";
     nix2container.url = "github:nlewo/nix2container";
     nix2container.inputs.nixpkgs.follows = "nixpkgs";
     mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin";
@@ -32,18 +34,13 @@
       perSystem = { config, self', inputs', pkgs, system, ... }:
         let
           cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
-          gitRev = self.shortRev or (self.dirtyShortRev or "unknown");
+          crateName = cargoToml.package.name;
         in
         {
-          packages.default = pkgs.rustPlatform.buildRustPackage {
-            pname = cargoToml.package.name;
-            version = "${cargoToml.package.version}+${gitRev}";
-            src = ./.;
-            cargoLock.lockFile = ./Cargo.lock;
-          };
+          packages.default = config.devenv.shells.default.languages.rust.import ./. { };
 
           devenv.shells.default = {
-            name = "my-project";
+            name = crateName;
 
             imports = [
               # This is just like the imports in devenv.nix.
@@ -53,8 +50,7 @@
 
             languages.rust = {
               enable = true;
-              channel = "stable";
-              targets = [ "aarch64-apple-darwin" ];
+              toolchainFile = ./rust-toolchain.toml;
             };
 
             # https://devenv.sh/reference/options/
@@ -66,36 +62,6 @@
 
             scripts.build-aarch64-darwin.exec = ''
               cargo zigbuild --release --target aarch64-apple-darwin
-            '';
-
-            scripts.sign-aarch64-darwin.exec = ''
-              set -euo pipefail
-              binary=target/aarch64-apple-darwin/release/devenv-rust-test
-              p12="''${MACOS_CODESIGN_P12_PATH:-/tmp/codesign.p12}"
-
-              if [ -f "$p12" ]; then
-                rcodesign sign --p12-file "$p12" --p12-password "$MACOS_CODESIGN_P12_PASSWORD" "$binary"
-              else
-                echo "no codesigning certificate found at $p12, falling back to ad-hoc signing"
-                rcodesign sign "$binary"
-              fi
-
-              rcodesign print-signature-info "$binary"
-            '';
-
-            scripts.sign.exec = ''
-              set -euo pipefail
-              binary=target/release/devenv-rust-test
-              p12="''${MACOS_CODESIGN_P12_PATH:-/tmp/codesign.p12}"
-
-              if [ -f "$p12" ]; then
-                rcodesign sign --p12-file "$p12" --p12-password "$MACOS_CODESIGN_P12_PASSWORD" "$binary"
-              else
-                echo "no codesigning certificate found at $p12, falling back to ad-hoc signing"
-                rcodesign sign "$binary"
-              fi
-
-              rcodesign print-signature-info "$binary"
             '';
 
             scripts.tests.exec = ''
