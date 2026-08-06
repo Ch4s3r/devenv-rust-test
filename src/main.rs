@@ -1,7 +1,7 @@
 use aws_lc_rs::digest;
 
 fn greeting() -> &'static str {
-    "Hello, world!"
+    "Hello, world! aaaaaa"
 }
 
 fn greeting_sha256_hex() -> String {
