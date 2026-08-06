@@ -37,34 +37,26 @@ suite as part of its check phase.
 
 ## CI
 
-`.github/workflows/cross-build.yml` runs on a single `ubuntu-latest` runner and:
+`.github/workflows/build.yml` runs a `ubuntu-latest` + `macos-latest` matrix. Each job:
 
-- runs `cargo nextest run` (via the `tests` devenv script)
-- builds the native `x86_64-linux` release binary (via the `build` devenv script)
-- cross-compiles an `aarch64-apple-darwin` release binary using
-  [`cargo-zigbuild`](https://github.com/rust-cross/cargo-zigbuild) (via the
-  `build-aarch64-darwin` devenv script), since Nix's own cross-compilation does not support
-  building for Darwin from a Linux build platform
+- runs the test suite via `nix build .#tests -L`
+- builds the release artifact via `nix build .#default`
+- on `macos-latest`, code-signs the release binary (see below)
+- uploads the binary as a workflow artifact (`devenv-rust-test-<os>`)
 
-The `aarch64-apple-darwin` binary is then code-signed using
-[`rcodesign`](https://github.com/indygreg/apple-platform-rs) (via the
-`sign-aarch64-darwin` devenv script), a pure-Rust, cross-platform implementation of
-Apple code signing that works on the Linux `arc-runner-set` CI runner without needing
-a real macOS host.
+Steps run inside `nix develop --impure -c bash -- {0}` (set via `defaults.run.shell`), so
+devenv scripts are available by name.
 
-If the repository secrets `MACOS_CODESIGN_P12_BASE64` and `MACOS_CODESIGN_P12_PASSWORD`
-are set, the workflow decodes the base64 secret into a `.p12` certificate and signs the
-binary with it. Otherwise it falls back to ad-hoc signing (no identity), which is enough
-to satisfy macOS Gatekeeper for local/unnotarized use but not for distribution.
+### macOS code signing
 
-Both binaries are uploaded as workflow artifacts (`devenv-rust-test-x86_64-linux` and
-`devenv-rust-test-aarch64-darwin`).
+The `macos-latest` job signs the release binary using
+[`rcodesign`](https://github.com/indygreg/apple-platform-rs) (via the `sign` devenv script),
+a pure-Rust implementation of Apple code signing.
 
-Each step follows the [devenv GitHub Actions integration](https://devenv.sh/integrations/github-actions/)
-pattern (`cachix/install-nix-action`, `cachix/cachix-action` with the `devenv` cache,
-`nix profile add nixpkgs#devenv`, `nix develop --impure -c bash -- {0}` running the named
-devenv script).
-
-`.github/workflows/build.yml` (the previous `ubuntu-latest` + `macos-latest` matrix, building
-natively on a real macOS runner) is disabled — its trigger is commented out — and kept only
-for reference.
+The CI step is a one-liner (`run: sign`); the `sign` script itself handles the logic: it
+copies `result/bin/devenv-rust-test` to a writable location (the Nix store output is
+read-only), then if `MACOS_CODESIGN_P12_BASE64` and `MACOS_CODESIGN_P12_PASSWORD` are set,
+decodes the base64 secret via process substitution (`<(base64 -d <<< ...)`) straight into
+`rcodesign`, so the `.p12` certificate never touches disk. Otherwise it falls
+back to ad-hoc signing (no identity), which is enough to satisfy macOS Gatekeeper for
+local/unnotarized use but not for distribution.
