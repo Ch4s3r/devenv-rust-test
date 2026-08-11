@@ -303,6 +303,10 @@ jobs:
           echo "CACHE LOOKUP"
           echo "=================================================="
 
+          echo "Lookup elapsed: ${ELAPSED} seconds"
+          echo "Cache hit:      ${CACHE_HIT}"
+          echo "Matched key:    ${CACHE_KEY}"
+
       # ------------------------------------------------------------
       # 6b. SEED CACHE ON FIRST RUN
       #
@@ -323,10 +327,6 @@ jobs:
         with:
           path: ${{ env.CACHE_PATH }}
           key: ${{ env.CACHE_KEY }}
-
-          echo "Lookup elapsed: ${ELAPSED} seconds"
-          echo "Cache hit:      ${CACHE_HIT}"
-          echo "Matched key:    ${CACHE_KEY}"
 
 
       # ------------------------------------------------------------
