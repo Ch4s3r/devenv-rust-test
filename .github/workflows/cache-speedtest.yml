@@ -303,6 +303,27 @@ jobs:
           echo "CACHE LOOKUP"
           echo "=================================================="
 
+      # ------------------------------------------------------------
+      # 6b. SEED CACHE ON FIRST RUN
+      #
+      # On cache miss, populate CACHE_PATH with a 1 GiB dummy file
+      # and save it, so subsequent runs have real data to restore.
+      # ------------------------------------------------------------
+      - name: Seed cache with 1GiB dummy file
+        if: steps.lookup.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${CACHE_PATH}"
+          dd if=/dev/urandom of="${CACHE_PATH}/dummy.bin" bs=1M count=1024
+
+      - name: Save seeded cache
+        if: steps.lookup.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CACHE_PATH }}
+          key: ${{ env.CACHE_KEY }}
+
           echo "Lookup elapsed: ${ELAPSED} seconds"
           echo "Cache hit:      ${CACHE_HIT}"
           echo "Matched key:    ${CACHE_KEY}"
