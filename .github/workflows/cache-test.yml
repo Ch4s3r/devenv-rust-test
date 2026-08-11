@@ -15,7 +15,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: dummy.bin
-          key: dummy-1gb-file-v1
+          key: dummy-1gb-file-v2
 
       - name: Time cache restore
         if: steps.cache.outputs.cache-hit == 'true'
