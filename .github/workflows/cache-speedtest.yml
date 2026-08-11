@@ -1,0 +1,433 @@
+name: GitHub Cache Speed Test
+
+on:
+  workflow_dispatch:
+
+env:
+  # CHANGE THESE
+  CACHE_PATH: .cache
+  CACHE_KEY: my-cache-key
+
+jobs:
+  cache-speedtest:
+    name: Cache restore benchmark
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------
+      # 1. RUNNER INFORMATION
+      # ------------------------------------------------------------
+      - name: Runner information
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          echo "=================================================="
+          echo "RUNNER"
+          echo "=================================================="
+
+          echo "Hostname:"
+          hostname
+
+          echo
+          echo "Kernel:"
+          uname -a
+
+          echo
+          echo "CPU:"
+          nproc
+          lscpu | grep -E \
+            'Model name|Socket|Core|Thread|CPU\(s\)|MHz' || true
+
+          echo
+          echo "Memory:"
+          free -h
+
+          echo
+          echo "Filesystem:"
+          df -hT .
+
+          echo
+          echo "Mount:"
+          findmnt -T . || true
+
+          echo
+          echo "Temporary directory:"
+          echo "${RUNNER_TEMP}"
+          df -hT "${RUNNER_TEMP}"
+
+          echo
+          echo "zstd:"
+          zstd --version || true
+
+          echo
+          echo "tar:"
+          tar --version | head -n 1 || true
+
+
+      # ------------------------------------------------------------
+      # 2. DISK WRITE TEST
+      #
+      # Writes 2 GiB to RUNNER_TEMP.
+      # Increase/decrease count if desired.
+      # ------------------------------------------------------------
+      - name: Sequential disk write benchmark
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          TEST_FILE="${RUNNER_TEMP}/github-cache-disk-test.bin"
+
+          echo "=================================================="
+          echo "DISK WRITE TEST"
+          echo "=================================================="
+
+          rm -f "${TEST_FILE}"
+
+          sync
+
+          START=$(date +%s.%N)
+
+          dd \
+            if=/dev/zero \
+            of="${TEST_FILE}" \
+            bs=64M \
+            count=32 \
+            conv=fdatasync \
+            status=progress
+
+          END=$(date +%s.%N)
+
+          ELAPSED=$(awk "BEGIN {print ${END}-${START}}")
+
+          echo
+          echo "Disk write elapsed: ${ELAPSED} seconds"
+
+          ls -lh "${TEST_FILE}"
+
+
+      # ------------------------------------------------------------
+      # 3. DISK READ TEST
+      # ------------------------------------------------------------
+      - name: Sequential disk read benchmark
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          TEST_FILE="${RUNNER_TEMP}/github-cache-disk-test.bin"
+
+          echo "=================================================="
+          echo "DISK READ TEST"
+          echo "=================================================="
+
+          # Try to avoid measuring Linux page cache.
+          if command -v sudo >/dev/null 2>&1; then
+            sync
+            sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' || true
+          fi
+
+          START=$(date +%s.%N)
+
+          dd \
+            if="${TEST_FILE}" \
+            of=/dev/null \
+            bs=64M \
+            status=progress
+
+          END=$(date +%s.%N)
+
+          ELAPSED=$(awk "BEGIN {print ${END}-${START}}")
+
+          echo
+          echo "Disk read elapsed: ${ELAPSED} seconds"
+
+          rm -f "${TEST_FILE}"
+
+
+      # ------------------------------------------------------------
+      # 4. FILE METADATA TEST
+      #
+      # Useful because a cache with 500k tiny files can restore
+      # slowly even when sequential disk performance is excellent.
+      # ------------------------------------------------------------
+      - name: Small-file filesystem benchmark
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          TEST_DIR="${RUNNER_TEMP}/github-cache-smallfiles-test"
+
+          rm -rf "${TEST_DIR}"
+          mkdir -p "${TEST_DIR}"
+
+          FILE_COUNT=10000
+
+          echo "=================================================="
+          echo "SMALL FILE TEST"
+          echo "Creating ${FILE_COUNT} files"
+          echo "=================================================="
+
+          START=$(date +%s.%N)
+
+          for i in $(seq 1 "${FILE_COUNT}"); do
+            printf 'cache-test\n' > "${TEST_DIR}/file-${i}"
+          done
+
+          sync
+
+          END=$(date +%s.%N)
+
+          ELAPSED=$(awk "BEGIN {print ${END}-${START}}")
+          RATE=$(awk "BEGIN {printf \"%.0f\", ${FILE_COUNT}/${ELAPSED}}")
+
+          echo
+          echo "Create time:       ${ELAPSED} s"
+          echo "Files/sec:         ${RATE}"
+
+          echo
+          echo "Deleting files..."
+
+          START=$(date +%s.%N)
+
+          rm -rf "${TEST_DIR}"
+
+          END=$(date +%s.%N)
+
+          ELAPSED=$(awk "BEGIN {print ${END}-${START}}")
+
+          echo "Delete time:       ${ELAPSED} s"
+
+
+      # ------------------------------------------------------------
+      # 5. ZSTD CPU BENCHMARK
+      #
+      # Cache archives use compression. This estimates whether
+      # decompression CPU could be the limiting factor.
+      # ------------------------------------------------------------
+      - name: zstd decompression benchmark
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          TEST_FILE="${RUNNER_TEMP}/zstd-source.bin"
+          TEST_ARCHIVE="${RUNNER_TEMP}/zstd-source.bin.zst"
+
+          echo "=================================================="
+          echo "ZSTD TEST"
+          echo "=================================================="
+
+          # Random data gives zstd realistic work.
+          dd \
+            if=/dev/urandom \
+            of="${TEST_FILE}" \
+            bs=16M \
+            count=32 \
+            status=none
+
+          echo "Compressing benchmark file..."
+
+          zstd \
+            -q \
+            -3 \
+            -f \
+            "${TEST_FILE}" \
+            -o "${TEST_ARCHIVE}"
+
+          ls -lh "${TEST_FILE}" "${TEST_ARCHIVE}"
+
+          echo
+          echo "Decompression benchmark:"
+
+          START=$(date +%s.%N)
+
+          zstd \
+            -q \
+            -d \
+            -f \
+            "${TEST_ARCHIVE}" \
+            -c > /dev/null
+
+          END=$(date +%s.%N)
+
+          ELAPSED=$(awk "BEGIN {print ${END}-${START}}")
+
+          SIZE_BYTES=$(stat -c '%s' "${TEST_FILE}")
+
+          RATE=$(awk \
+            "BEGIN {printf \"%.1f\", (${SIZE_BYTES}/1024/1024)/${ELAPSED}}")
+
+          echo
+          echo "zstd decompression:"
+          echo "  Time:       ${ELAPSED} s"
+          echo "  Throughput: ${RATE} MiB/s"
+
+          rm -f "${TEST_FILE}" "${TEST_ARCHIVE}"
+
+
+      # ------------------------------------------------------------
+      # 6. CACHE LOOKUP ONLY
+      #
+      # This talks to the cache service but does NOT download
+      # the archive.
+      # ------------------------------------------------------------
+      - name: Cache lookup benchmark
+        id: cache-lookup
+        shell: bash
+        run: |
+          echo "lookup-start=$(date +%s.%N)" >> "${GITHUB_OUTPUT}"
+
+
+      - name: Cache lookup
+        id: lookup
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CACHE_PATH }}
+          key: ${{ env.CACHE_KEY }}
+          lookup-only: true
+
+
+      - name: Cache lookup result
+        shell: bash
+        env:
+          START: ${{ steps.cache-lookup.outputs.lookup-start }}
+          CACHE_HIT: ${{ steps.lookup.outputs.cache-hit }}
+          CACHE_KEY: ${{ steps.lookup.outputs.cache-primary-key }}
+        run: |
+          END=$(date +%s.%N)
+          ELAPSED=$(awk "BEGIN {print ${END}-${START}}")
+
+          echo "=================================================="
+          echo "CACHE LOOKUP"
+          echo "=================================================="
+
+          echo "Lookup elapsed: ${ELAPSED} seconds"
+          echo "Cache hit:      ${CACHE_HIT}"
+          echo "Matched key:    ${CACHE_KEY}"
+
+
+      # ------------------------------------------------------------
+      # 7. REMOVE EXISTING CACHE DIRECTORY
+      #
+      # Important so the restore actually writes files.
+      # ------------------------------------------------------------
+      - name: Remove existing cache files
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          echo "Deleting existing cache path:"
+          echo "${CACHE_PATH}"
+
+          rm -rf "${CACHE_PATH}"
+
+
+      # ------------------------------------------------------------
+      # 8. ACTUAL CACHE RESTORE
+      # ------------------------------------------------------------
+      - name: Start cache restore timer
+        id: restore-start
+        shell: bash
+        run: |
+          echo "timestamp=$(date +%s.%N)" >> "${GITHUB_OUTPUT}"
+
+
+      - name: Restore cache
+        id: restore
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CACHE_PATH }}
+          key: ${{ env.CACHE_KEY }}
+
+
+      # ------------------------------------------------------------
+      # 9. CACHE STATISTICS
+      # ------------------------------------------------------------
+      - name: Analyze restored cache
+        id: analyze
+        shell: bash
+        env:
+          START: ${{ steps.restore-start.outputs.timestamp }}
+        run: |
+          set -euxo pipefail
+
+          END=$(date +%s.%N)
+          ELAPSED=$(awk "BEGIN {print ${END}-${START}}")
+
+          echo "=================================================="
+          echo "CACHE RESTORE RESULTS"
+          echo "=================================================="
+
+          if [ ! -e "${CACHE_PATH}" ]; then
+            echo "Cache path does not exist."
+            echo "Likely cache miss."
+            exit 0
+          fi
+
+          SIZE_BYTES=$(du -sb "${CACHE_PATH}" | cut -f1)
+          SIZE_GIB=$(awk \
+            "BEGIN {printf \"%.2f\", ${SIZE_BYTES}/1024/1024/1024}")
+
+          FILE_COUNT=$(find "${CACHE_PATH}" -type f | wc -l)
+
+          DIR_COUNT=$(find "${CACHE_PATH}" -type d | wc -l)
+
+          RATE_MIB=$(awk \
+            "BEGIN {printf \"%.1f\", (${SIZE_BYTES}/1024/1024)/${ELAPSED}}")
+
+          echo
+          echo "Cache path:           ${CACHE_PATH}"
+          echo "Restored size:        ${SIZE_GIB} GiB"
+          echo "Files:                ${FILE_COUNT}"
+          echo "Directories:          ${DIR_COUNT}"
+          echo "Restore elapsed:      ${ELAPSED} s"
+          echo "Effective throughput: ${RATE_MIB} MiB/s"
+
+          echo
+          echo "Average file size:"
+
+          if [ "${FILE_COUNT}" -gt 0 ]; then
+            AVG=$(awk \
+              "BEGIN {printf \"%.1f\", ${SIZE_BYTES}/${FILE_COUNT}/1024}")
+            echo "${AVG} KiB"
+          fi
+
+          {
+            echo "elapsed=${ELAPSED}"
+            echo "size_gib=${SIZE_GIB}"
+            echo "files=${FILE_COUNT}"
+            echo "rate_mib=${RATE_MIB}"
+          } >> "${GITHUB_OUTPUT}"
+
+
+      # ------------------------------------------------------------
+      # 10. SUMMARY
+      # ------------------------------------------------------------
+      - name: Write benchmark summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# GitHub Cache Benchmark"
+            echo
+            echo "## Cache restore"
+            echo
+            echo "| Metric | Result |"
+            echo "|---|---:|"
+            echo "| Cache key | \`${CACHE_KEY}\` |"
+            echo "| Cache path | \`${CACHE_PATH}\` |"
+            echo "| Cache hit | \`${{ steps.restore.outputs.cache-hit }}\` |"
+            echo "| Restored size | ${{ steps.analyze.outputs.size_gib }} GiB |"
+            echo "| Files | ${{ steps.analyze.outputs.files }} |"
+            echo "| Restore time | ${{ steps.analyze.outputs.elapsed }} s |"
+            echo "| Effective rate | ${{ steps.analyze.outputs.rate_mib }} MiB/s |"
+            echo
+            echo "## Interpretation"
+            echo
+            echo "- **Fast disk + slow restore:** investigate network/cache service."
+            echo "- **Slow disk + slow restore:** runner storage is likely limiting."
+            echo "- **Fast sequential disk but huge file count:** filesystem metadata/extraction may be limiting."
+            echo "- **Low zstd throughput:** runner CPU/decompression may be limiting."
+          } >> "${GITHUB_STEP_SUMMARY}"
