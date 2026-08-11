@@ -1,0 +1,30 @@
+name: "Cache Test"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/cache-test.yml
+
+jobs:
+  cache-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore cached dummy file
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: dummy.bin
+          key: dummy-1gb-file-v1
+
+      - name: Time cache restore
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: |
+          echo "Cache hit. Restore step duration is reported by actions/cache above (see 'Restore cached dummy file' step timing in the run log)."
+          ls -lh dummy.bin
+
+      - name: Generate 1GB dummy file
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          dd if=/dev/urandom of=dummy.bin bs=1M count=1024
+          ls -lh dummy.bin
