@@ -1,7 +1,7 @@
 use aws_lc_rs::digest;
 
 fn greeting() -> &'static str {
-    "Hello, world!"
+    "Hello, Rust!"
 }
 
 fn greeting_sha256_hex() -> String {
@@ -23,8 +23,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn greeting_says_hello_world() {
-        assert_eq!(greeting(), "Hello, world!");
+    fn greeting_says_hello_rust() {
+        assert_eq!(greeting(), "Hello, Rust!");
     }
 
     #[test]
@@ -38,8 +38,8 @@ mod tests {
     }
 
     #[test]
-    fn greeting_contains_world() {
-        assert!(greeting().contains("world"));
+    fn greeting_contains_rust() {
+        assert!(greeting().contains("Rust"));
     }
 
     #[test]
@@ -49,14 +49,14 @@ mod tests {
 
     #[test]
     fn greeting_has_expected_length() {
-        assert_eq!(greeting().len(), "Hello, world!".len());
+        assert_eq!(greeting().len(), "Hello, Rust!".len());
     }
 
     #[test]
     fn greeting_sha256_hex_matches_known_digest() {
         assert_eq!(
             greeting_sha256_hex(),
-            "315f5bdb76d078c43b8ac0064e4a0164612b1fce77c869345bfc94c75894edd3"
+            "12a967da1e8654e129d41e3c016f14e81e751e073feb383125bf82080256ca19"
         );
     }
 }
