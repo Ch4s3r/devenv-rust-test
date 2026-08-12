@@ -2,9 +2,6 @@ name: "Cache Test"
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - .github/workflows/cache-test.yml
 
 jobs:
   cache-test:
